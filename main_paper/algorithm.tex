@@ -1,0 +1,109 @@
+\section{(Asymmetrical) Matrix Factorization}
+In this section, we introduce and review our objective function for learning the item-similarity matrix $B$. In this work, we learn the weights $B$ via regularized least squares:
+\begin{equation}\label{eqn:ease}
+    \min_{B} \left\lVert \sqrt{W} \odot (X - XB)\right\rVert_F^2 + \lambda \|B\|_F^2\,,
+\end{equation}
+where $W \in \mathbb{R}_{\geq 0}^{|\mathcal{U}|\times |\mathcal{I}|}$ is a set of non-negative weights. We also consider two low rank variants of the above model, first with ``dropout'' style regularization
+\begin{align}\label{eqn:awmf-dropout}
+    \min_{U,V\in\mathbb{R}^{|\mathcal{I}|\times d}} \left\lVert \sqrt{W} \odot (X - XUV^\top)\right\rVert_F^2 + \lambda\|UV^\top\|_F^2\, \quad\text{ and }
+\end{align}
+and then with ``weight decay'' style regularization.
+\begin{align}\label{eqn:awmf-weightdecay}
+    \min_{U,V\in\mathbb{R}^{|\mathcal{I}|\times d}} \left\lVert \sqrt{W} \odot (X - XUV^\top)\right\rVert_F^2 + \lambda\|U\|_F^2 + \lambda \|V\|_F^2\,
+\end{align}
+where $d \leq \mathcal{I}$. The insight that the regularization schemes in \cref{eqn:awmf-dropout,eqn:awmf-weightdecay} can be related to dropout and weight decay is due to \citet{steck2021regularization}. 
+
+The above objectives can minimized via alternating minimization (\citet{cichocki2007regularized}). We mention that both \citet{ye2021global} and \citet{lee2023randomly} show that the global optima of \cref{eqn:awmf-dropout,eqn:awmf-weightdecay} can be found via alternating minimization when both $U,V$ are initialized from a normal distribution, $W$ is a multiple of the ones matrix and $\lambda = 0$. It remains open whether such a result holds when $W$ is not a constant matrix and $\ell_2$ regularization is present. Several further comments are in order:
+\begin{itemize}
+    \item We choose the square loss (here $\| \cdot \|_F$ denotes the Frobenuis norm) as is standard in the literature when applying matrix factorization in collaborative filtering/top-$N$ recommendations (\citet{hu2008collaborative,ning2011slim,steck2019embarrassingly,NEURIPS2020_e33d974a}). \citet{liang2018variational,depauw24} observe that training with different loss functions such as the logistic loss yield better ranking accuracy over the \textit{unweighted} square loss, as the log-loss reweights the data (\citet{ayoubswitching}). However, as will we will argue shortly, training on unweighted data gives the best performance with the added benefit of lower computational costs. 
+    \item We will use weights of the form $W = aX + 1$ for $a \geq 0$ as was first proposed by \citet{hu2008collaborative}. \textbf{NEED AN EXPLANATION FOR THIS!!!!}
+    \item We will use various forms of $\ell_2$-regularization. As was observed by \citet{NEURIPS2020_e33d974a,steck2021regularization} and \citet{jin2021towards}, if we let the item similarity matrix be low rank, i.e., $B=UV^\top$, then different regularization schemes can lead to different ranking accuracy. Note that this adds an additional hyperparameter $\lambda$ to be optimized on a held-out validation set. 
+\end{itemize}
+
+\subsection{Closed-Form Solution: Unregularized}
+In this section, we show that the objective functions for learning the item similarity matrices $B$ and $UV^\top$ in \cref{eqn:ease} and \cref{eqn:awmf-dropout,eqn:awmf-weightdecay} can be solved in closed form when $\lambda = 0$. The choice to first present the result for the unregularized case is done solely for exposition. In the proceeding section we will extend our analysis to hold when $\lambda > 0$. Our result contradicts a claim made by \citet{steck2019collaborative,jin2021towards} where the authors claim that a closed form solution to \cref{eqn:ease} and \cref{eqn:awmf-dropout,eqn:awmf-weightdecay} does not exist when $W$ is a general weighting-matrix. Thus we resolve an open question by giving a closed form solution to the objectives in \cref{eqn:ease,eqn:awmf-dropout,eqn:awmf-weightdecay}. 
+
+In order to derive our closed form solution, we will first review the definition of the Kronecker product. 
+\begin{definition}[Kronecker product]
+    The Kronecker product of a matrix $A \in \mathbb{R}^{m\times n}$ and $B \in \mathbb{R}^{p\times q}$ is denoted by $A \otimes B$ and is defined to be the block matrix
+    \begin{equation*}
+        A\otimes B = 
+        \begin{bmatrix}
+        a_{11}B & a_{12}B & \cdots & a_{1n}B \\
+        a_{21}B & a_{22}B & \cdots & a_{2n}B \\
+        \vdots  & \vdots  & \ddots & \vdots  \\
+        a_{m1}B & a_{m2}B & \cdots & a_{mn}B\
+        \end{bmatrix}\,.
+    \end{equation*}
+    We refer the reader to Chapter 4.2 of \citet{Horn_Johnson_1991} for elementary properties of the Kronecker product which we will employ in deriving our closed form solution. We will also need the following ``vectorization'' lemma to derive our closed-form solution.
+    \begin{lemma}[Lemma 4.3.1 of \citet{Horn_Johnson_1991}]\label{lem:vectorization}
+        Let matrices $A \in \mathbb{R}^{m\times n},B \in \mathbb{R}^{p\times q}$ and $C \in \mathbb{R}^{m \times q}$ be given and $X \in \mathbb{R}^{n \times p}$ be unknown. The matrix equation
+        \begin{equation*}
+            AXB = C
+        \end{equation*}
+        is equivalent to the system of $qm$ equations in $np$ unknowns given by
+        \begin{equation*}
+            (B^\top \otimes A)\ve(X) = \ve(C)\,,
+        \end{equation*}
+        that is, $\ve(AXB) = (B^\top \otimes A)\ve(X)$ where $\ve(A)$ is the $mn\times 1$ column vector obtained by stacking the columns of $A$ on top of one another\footnote{$\ve(A)=A.$flatten('F') in numpy}.
+    \end{lemma}
+\end{definition}
+The vectorization lemma has historical been used to reason about and compute solutions to the Sylvester's equation $AX + XB = C$ and Lypanuov equations $AXA^\top - X + B = 0$, which arise natural when studying linear dynamical systems in control theory. Here one can use the vectorization lemma to ``linearize'' these seemingly nonlinear matrix equations. Our closed-form solutions takes inspiration from this application of the vectorization lemma.
+
+In what follows we first consider the case when $\lambda = 0$ and then, in the following section, extend our analysis to the general case when $\lambda >0$. 
+The optimization problem in \cref{eqn:ease} can be solved by taking its derivative and setting it to be zero, 
+\begin{equation*}
+     X^T\left(W \odot(XB - X) \right) = 0\,.
+\end{equation*}
+Previous attempts at finding a closed form solution failed due to the nature of the Hadamard (element-wise) product $\odot$, which does not allow the order operations to be exchanged. Employing \cref{lem:vectorization} and re-arranging, we can rewrite the above matrix equation as
+\begin{align*}\label{eqn:ease-soln}
+    \ve(X^\top(W\odot X)) &= \ve\left(X^T\left(W \odot(XB)\right)\right) \\
+    &= (I\otimes X^\top)\ve(W\odot(XB)) \\
+    &= (I\otimes X^\top)(\ve(W)\odot\ve(XB)) \\
+    &= (I \otimes X^\top)\di(\ve(W))\ve(XB) \\
+    &= (I\otimes X^\top)\di(\ve(W))(I\otimes X)\ve(B)\,
+\end{align*}
+where the second and last equality use \cref{lem:vectorization} and the fourth equality uses the fact that for vectors $x,y$, it holds that $x\odot y = \di(x)y$. Re-arranging the above equation gives the following closed form for $B$
+\begin{equation}\label{eqn:closed-form-ease}
+    \ve(B) = \big(\underbrace{(I\otimes X^\top)\di(\ve(W))(I\otimes X)}_{=H_B}\big)^{-1} \ve(X^\top(W\odot X))\,.
+\end{equation}
+Finally, we note the while a closed form solution for $B$ was given in terms of $W$ and $X$, this method can be used for finding a closed form solution for any optimization problem of the form,
+\begin{equation*}
+    \min_{U,V\in\mathbb{R}^{|\mathcal{I}|\times d}} \left\lVert \sqrt{W} \odot (X - XUV^\top)\right\rVert_F^2\,.
+\end{equation*}
+
+We now employ a similar calculation for computing the minimizer of \cref{eqn:awmf-dropout,eqn:awmf-weightdecay} when $\lambda = 0$. Since we will employ alternating minimization for solving \cref{eqn:awmf-dropout,eqn:awmf-weightdecay}, we first fix $V$ and compute the closed form solution for $U$ and then repeat a similar calculation to find the closed form solution for $U$. Taking the derivative of expression to the left of the sum in \cref{eqn:awmf-dropout} with respect to $U$ and setting it to be zero gives
+\begin{equation*}
+    X^\top(W\odot(XUV^\top - X))V = 0\,.
+\end{equation*}
+Employing \cref{lem:vectorization} and re-arranging the above display gives us
+\begin{align*}
+    \ve(X^\top(W\odot X)V) &=  X^\top(W\odot(XUV^\top))V \\
+    &= (V^\top\otimes X^\top)\ve(W\odot(XUV^\top))\\
+    &= (V^\top\otimes X^\top)\ve(W)\odot\ve(XUV^\top)\\
+    &= \underbrace{(V^\top\otimes X^\top)\di(\ve(W))(V\otimes X)}_{=H_U}\ve(U)\,.
+\end{align*}
+Re-arraigning the above equation gives the following closed form of $U$
+\begin{align}\label{eqn:awmfU-soln}
+    \ve(U)
+    = \big(\underbrace{(V^\top\otimes X^\top)\bar{W}(V\otimes X)}_{=H_V}\big)^{-1} \ve(X^\top(W\odot X)V)\,,
+\end{align}
+where $\bar{W} = \di(\ve(W))$
+Repeating the same calculations for $V$ we get that
+\begin{equation}\label{eqn:awmfV-soln}
+    \ve(V) = \big((XU^\top \otimes I)\bar{W}(XU\otimes I)\big)^{-1} \ve((W^\top\odot X^\top)XU)
+\end{equation}
+where $\bar{W} = \di(\ve(W))$. In the next section, we will extend our analysis to hold for any $\lambda > 0$. 
+\subsection{Closed-Form Solution: Regularized}
+In this section, we show that the regularized objective functions for learning $B$, $U$ and $V$ in \cref{eqn:ease,eqn:awmf-dropout,eqn:awmf-weightdecay} can be solved in closed form.
+
+\subsection{Computational Considerations}
+The matrix $B$ can be computed without storing $H$ or computing the Kronecker products if given the singular value decomposition (SVD) of the matrix $X$, i.e., $X = Y\Sigma Z^\top$ where $Y,Z$ are orthonormal matrices and $\Sigma$ is a diagonal matrix. Let $A^+$ denote the Moore-Penrose inverse of $A$ and then it holds that that $(ABC)^+ = C^+B^+A^+$ and if $A$ is invertible then $A^+ = A^{-1}$ (see Section 6C of \citet{axler}). Then given the SVD of $X$ and letting $\bar W = \di(\ve(W))$, 
+\begin{align*}
+    H^{-1}=H^{+} &= (I\otimes X)^+ \bar W^+ (I\otimes X^\top)^+ \\
+    &= (I\otimes Y\Sigma Z^\top)^+ \bar W^+ (I\otimes Z\Sigma Y^\top)^+ \\
+    &= (I^+\otimes Z\Sigma^+ Y^\top) \bar W^+ (I^+\otimes Y\Sigma^+ Z^\top) \\
+    &= (I\otimes Z\Sigma^+ Y^\top) \bar W^{-1} (I^{-1}\otimes Y\Sigma^+ Z^\top)
+\end{align*}
+where the third equality follows from the definitions of the Kronecker product and the Moore-Penrose inverse (e.g. Exercise 10.25 \citet{Abadir_Magnus_2005}) and the final equality that $Y,Z$ are orthonormal, i.e., $Y^+ = Y^{-1} = Y^\top$ and $Z^+ = Z^{-1}=Z^\top$. The Moore-Penrose inverse of the diagonal matrix $\Sigma$ is computed by simply inverting all its nonzero entries. Again employing \cref{lem:vectorization}, we have t
+
